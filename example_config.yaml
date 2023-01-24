@@ -1,0 +1,18 @@
+service:
+  # Internal name of service. Should not contain spaces.
+  internalName: MyService
+  # Friendly display name of service.
+  displayName: My Lovely Service
+  # Description of service.
+  description: Does stuff!
+
+# Stuff pertaining to logging
+log:
+  # More logging if this is set to true.
+  debug: false
+  # Log file. All logging will be written here.
+  # Can be relative to executable path, or absolute.
+  logFilename: my_service.log
+  # Error log file. Only errors will be written to this.
+  # Can be relative to executable path, or absolute.
+  errorLogFilename: my_service.error.log
