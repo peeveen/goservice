@@ -12,10 +12,6 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-// Our logger. Initially logs to console, but our code will later
-// "mute" the console output after some hooks are added.
-var logger *logrus.Logger = createLogger(os.Stderr, logrus.DebugLevel)
-
 func createLogger(out io.Writer, level logrus.Level) *logrus.Logger {
 	return &logrus.Logger{
 		Out:       out,

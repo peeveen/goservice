@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/kardianos/service"
+	"github.com/sirupsen/logrus"
 )
 
 func TestService(t *testing.T) {
@@ -29,7 +30,9 @@ func TestService(t *testing.T) {
 		}
 		return true, err
 	}
-	runner := MakeController("TestController", serviceFunction, time.Second*1)
+	runner := func(logger *logrus.Logger) ServiceRunner {
+		return MakeController("TestController", serviceFunction, time.Second*1, logger)
+	}
 	svc := MakeService(serviceConfig, runner, loggingConfig)
 	go func() {
 		time.Sleep(time.Second * 5)

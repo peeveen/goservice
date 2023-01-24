@@ -22,20 +22,27 @@ type ServiceRunner interface {
 
 type GoService struct {
 	Service service.Service
+	Logger  *logrus.Logger
 	adapter *serviceAdapter
 }
 
 func MakeServiceFunction(config service.Config, fn ServiceFunction, loggingConfig *LoggingConfig, controllerName string, pollDuration time.Duration) *GoService {
-	return MakeService(config, MakeController(controllerName, fn, pollDuration), loggingConfig)
+	return MakeService(config, func(logger *logrus.Logger) ServiceRunner {
+		return MakeController(controllerName, fn, pollDuration, logger)
+	}, loggingConfig)
 }
 
-func MakeService(config service.Config, runner ServiceRunner, loggingConfig *LoggingConfig) *GoService {
-	adapter := newServiceAdapter(runner, loggingConfig)
+func MakeService(config service.Config, serviceRunnerProvider func(logger *logrus.Logger) ServiceRunner, loggingConfig *LoggingConfig) *GoService {
+	// Our logger. Initially logs to console, but our code will later
+	// "mute" the console output after some hooks are added.
+	logger := createLogger(os.Stderr, logrus.DebugLevel)
+	runner := serviceRunnerProvider(logger)
+	adapter := newServiceAdapter(runner, loggingConfig, logger)
 	svc, err := service.New(adapter, &config)
 	if err != nil {
-		logAndQuit(err.Error(), true)
+		logAndQuit(logger, err.Error(), true)
 	}
-	return &GoService{svc, adapter}
+	return &GoService{svc, logger, adapter}
 }
 
 func (gs *GoService) Start() {
@@ -44,7 +51,7 @@ func (gs *GoService) Start() {
 	} else {
 		err := gs.Service.Run()
 		if err != nil {
-			logAndQuit(err.Error(), true)
+			logAndQuit(gs.Logger, err.Error(), true)
 		}
 	}
 }
@@ -55,7 +62,7 @@ func (gs *GoService) Stop() {
 	} else {
 		err := gs.Service.Stop()
 		if err != nil {
-			logAndQuit(err.Error(), true)
+			logAndQuit(gs.Logger, err.Error(), true)
 		}
 	}
 }
@@ -71,7 +78,7 @@ func handleCtrlC(response func()) {
 	}()
 }
 
-func logAndQuit(msg string, failed bool) {
+func logAndQuit(logger *logrus.Logger, msg string, failed bool) {
 	logAndExit := func(logFn func(_ logrus.FieldLogger, args ...interface{}), exitCode int) {
 		logFn(logger, msg)
 		os.Exit(exitCode)

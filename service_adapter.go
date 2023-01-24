@@ -10,6 +10,7 @@ import (
 type serviceAdapter struct {
 	serviceRunner ServiceRunner
 	loggingConfig *LoggingConfig
+	logger        *logrus.Logger
 }
 
 type LoggingConfig struct {
@@ -18,8 +19,8 @@ type LoggingConfig struct {
 	Debug            bool
 }
 
-func newServiceAdapter(serviceRunner ServiceRunner, loggingConfig *LoggingConfig) *serviceAdapter {
-	return &serviceAdapter{serviceRunner, loggingConfig}
+func newServiceAdapter(serviceRunner ServiceRunner, loggingConfig *LoggingConfig, logger *logrus.Logger) *serviceAdapter {
+	return &serviceAdapter{serviceRunner, loggingConfig, logger}
 }
 
 // Called in service mode, when requested to start.
@@ -27,13 +28,13 @@ func (a *serviceAdapter) Start(s service.Service) error {
 	// Create a system logger. If this fails, it's very bad news.
 	svcLogger, err := s.Logger(nil)
 	if err != nil {
-		logger.Fatal(err)
+		a.logger.Fatal(err)
 		return err
 	}
 	// We can stop using console logging now. The service logger,
 	// if running interactively, will log to console anyway. If
 	// not running interactively, logging will go to service logs.
-	logger.Out = io.Discard
+	a.logger.Out = io.Discard
 
 	a.addLoggerHooks(svcLogger)
 
@@ -55,7 +56,7 @@ func (a *serviceAdapter) Stop(s service.Service) error {
 
 func (a *serviceAdapter) addLoggerHooks(svcLogger service.Logger) {
 	// First hook is the service logger
-	logger.AddHook(NewServiceLoggerHook(svcLogger, a.loggingConfig != nil && a.loggingConfig.Debug))
+	a.logger.AddHook(NewServiceLoggerHook(svcLogger, a.loggingConfig != nil && a.loggingConfig.Debug))
 
 	if a.loggingConfig != nil {
 		// Then two hooks for output files.
@@ -66,18 +67,18 @@ func (a *serviceAdapter) addLoggerHooks(svcLogger service.Logger) {
 			}
 			runLogHook, err := NewFileLoggerHook(a.loggingConfig.LogFilename, true, runLogLevel, 50, 28)
 			if err != nil {
-				logger.Error(err.Error())
+				a.logger.Error(err.Error())
 			} else {
-				logger.AddHook(runLogHook)
+				a.logger.AddHook(runLogHook)
 			}
 		}
 
 		if a.loggingConfig.ErrorLogFilename != "" {
 			runLogHook, err := NewFileLoggerHook(a.loggingConfig.ErrorLogFilename, true, logrus.ErrorLevel, 50, 28)
 			if err != nil {
-				logger.Error(err.Error())
+				a.logger.Error(err.Error())
 			} else {
-				logger.AddHook(runLogHook)
+				a.logger.AddHook(runLogHook)
 			}
 		}
 	}

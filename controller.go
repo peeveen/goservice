@@ -15,17 +15,18 @@ type ServiceFunction = func(quit chan bool, hasQuit chan bool) (bool, error)
 // This is only useful to the poll() function, which will pause (for
 // "pollTime") if there was nothing to do, or repeat instantly if there was.
 type Controller struct {
-	name         string
+	Name         string
 	fn           ServiceFunction
 	pollTime     time.Duration
 	stop         chan bool
 	hasStopped   chan bool
 	hasCompleted chan bool
+	Logger       *logrus.Logger
 }
 
 // Creates a named controller from the given function.
-func MakeController(name string, fn func(quit chan bool, hasQuit chan bool) (bool, error), pollTime time.Duration) *Controller {
-	return &Controller{name, fn, pollTime, make(chan bool, 1), make(chan bool, 1), make(chan bool, 1)}
+func MakeController(name string, fn func(stop chan bool, hasStopped chan bool) (bool, error), pollTime time.Duration, logger *logrus.Logger) *Controller {
+	return &Controller{name, fn, pollTime, make(chan bool), make(chan bool), make(chan bool), logger}
 }
 
 // Signals the controller to stop, then waits for it to end.
@@ -41,7 +42,7 @@ func (ctrl *Controller) Run() error {
 	for !quit {
 		againNow, err := ctrl.fn(ctrl.stop, ctrl.hasStopped)
 		if err != nil {
-			logger.Error(err)
+			ctrl.Logger.Error(err)
 		}
 		// If function says "run again now", check first
 		// for whether stop has been requested.
@@ -82,7 +83,7 @@ func (ctrl *Controller) close() {
 }
 
 func (ctrl *Controller) AsLogFields() logrus.Fields {
-	return logrus.Fields{"controller": ctrl.name}
+	return logrus.Fields{"controller": ctrl.Name}
 }
 
 // Asks all the given controllers to stop, and waits until they have all stopped.
@@ -90,14 +91,14 @@ func QuitControllersAndWait(controllers []*Controller) {
 	var waitGroup sync.WaitGroup
 	waitGroup.Add(len(controllers))
 	for _, ctrl := range controllers {
-		logger.WithFields(ctrl.AsLogFields()).Info("Controller is stopping")
+		ctrl.Logger.WithFields(ctrl.AsLogFields()).Info("Controller is stopping")
 		ctrl.stop <- true
 	}
 	for _, ctrl := range controllers {
 		go func(q *Controller) {
 			defer waitGroup.Done()
 			<-q.hasStopped
-			logger.WithFields(q.AsLogFields()).Info("Controller has stopped")
+			q.Logger.WithFields(q.AsLogFields()).Info("Controller has stopped")
 		}(ctrl)
 	}
 	waitGroup.Wait()
