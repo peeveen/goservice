@@ -7,7 +7,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type ServiceFunction = func(quit chan bool, hasQuit chan bool) (bool, error)
+// Function called from the controller.
+// If it returns true, the function will be called again immediately.
+// If it returns false, the controller will pause (for the amount of time
+// defined by the controller's poll duration) before running the function again.
+// If it returns an error, the controller will exit.
+type ServiceFunction = func(quit chan bool, hasQuit chan bool, logger *logrus.Logger) (bool, error)
 
 // A "Controller" is basically a function that can be run in a goroutine
 // and can be asked to stop, and will report when it has stopped.
@@ -25,8 +30,8 @@ type Controller struct {
 }
 
 // Creates a named controller from the given function.
-func MakeController(name string, fn func(stop chan bool, hasStopped chan bool) (bool, error), pollTime time.Duration, logger *logrus.Logger) *Controller {
-	return &Controller{name, fn, pollTime, make(chan bool), make(chan bool), make(chan bool), logger}
+func MakeController(name string, fn ServiceFunction, pollTime time.Duration, logger *logrus.Logger) *Controller {
+	return &Controller{name, fn, pollTime, make(chan bool, 1), make(chan bool), make(chan bool), logger}
 }
 
 // Signals the controller to stop, then waits for it to end.
@@ -38,11 +43,12 @@ func (ctrl *Controller) Stop() error {
 
 // Repeatedly runs the function until signalled to stop.
 func (ctrl *Controller) Run() error {
-	var quit = false
-	for !quit {
-		againNow, err := ctrl.fn(ctrl.stop, ctrl.hasStopped)
+	var stop = false
+	for !stop {
+		againNow, err := ctrl.fn(ctrl.stop, ctrl.hasStopped, ctrl.Logger)
 		if err != nil {
 			ctrl.Logger.Error(err)
+			break
 		}
 		// If function says "run again now", check first
 		// for whether stop has been requested.
@@ -55,7 +61,7 @@ func (ctrl *Controller) Run() error {
 		}
 		// Wait for stop signal, or poll time to pass.
 		select {
-		case quit = <-ctrl.stop:
+		case stop = <-ctrl.stop:
 		case <-time.After(ctrl.pollTime):
 		}
 	}

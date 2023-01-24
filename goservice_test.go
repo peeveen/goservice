@@ -22,7 +22,7 @@ func TestService(t *testing.T) {
 		ErrorLogFilename: "testErrorLog.log",
 	}
 	iterations := 0
-	serviceFunction := func(quit chan bool, hasQuit chan bool) (bool, error) {
+	serviceFunction := func(quit chan bool, hasQuit chan bool, logger *logrus.Logger) (bool, error) {
 		iterations = iterations + 1
 		var err error = nil
 		if iterations == 3 {
