@@ -30,7 +30,7 @@ func MakeController(name string, fn func(quit chan bool, hasQuit chan bool) (boo
 
 // Signals the controller to stop, then waits for it to end.
 func (ctrl *Controller) Stop() error {
-	quitAndWait([]*Controller{ctrl})
+	QuitControllersAndWait([]*Controller{ctrl})
 	ctrl.hasCompleted <- true
 	return nil
 }
@@ -86,7 +86,7 @@ func (ctrl *Controller) AsLogFields() logrus.Fields {
 }
 
 // Asks all the given controllers to stop, and waits until they have all stopped.
-func quitAndWait(controllers []*Controller) {
+func QuitControllersAndWait(controllers []*Controller) {
 	var waitGroup sync.WaitGroup
 	waitGroup.Add(len(controllers))
 	for _, ctrl := range controllers {
