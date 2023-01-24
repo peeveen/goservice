@@ -31,7 +31,7 @@ type Controller struct {
 
 // Creates a named controller from the given function.
 func MakeController(name string, fn ServiceFunction, pollTime time.Duration, logger *logrus.Logger) *Controller {
-	return &Controller{name, fn, pollTime, make(chan bool, 1), make(chan bool), make(chan bool), logger}
+	return &Controller{name, fn, pollTime, make(chan bool, 1), make(chan bool, 1), make(chan bool, 1), logger}
 }
 
 // Signals the controller to stop, then waits for it to end.
