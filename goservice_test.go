@@ -30,8 +30,8 @@ func TestService(t *testing.T) {
 		}
 		return true, err
 	}
-	runner := func(logger *logrus.Logger) ServiceRunner {
-		return MakeController("TestController", serviceFunction, time.Second*1, logger)
+	runner := func(logger *logrus.Logger) (ServiceRunner, error) {
+		return MakeController("TestController", serviceFunction, time.Second*1, logger), nil
 	}
 	svc := MakeService(serviceConfig, runner, loggingConfig)
 	go func() {

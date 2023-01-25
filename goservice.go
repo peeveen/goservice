@@ -20,6 +20,8 @@ type ServiceRunner interface {
 	Stop() error
 }
 
+type ServiceRunnerProvider = func(logger *logrus.Logger) (ServiceRunner, error)
+
 type GoService struct {
 	Service service.Service
 	Logger  *logrus.Logger
@@ -27,16 +29,19 @@ type GoService struct {
 }
 
 func MakeServiceFunction(config service.Config, fn ServiceFunction, loggingConfig *LoggingConfig, controllerName string, pollDuration time.Duration) *GoService {
-	return MakeService(config, func(logger *logrus.Logger) ServiceRunner {
-		return MakeController(controllerName, fn, pollDuration, logger)
+	return MakeService(config, func(logger *logrus.Logger) (ServiceRunner, error) {
+		return MakeController(controllerName, fn, pollDuration, logger), nil
 	}, loggingConfig)
 }
 
-func MakeService(config service.Config, serviceRunnerProvider func(logger *logrus.Logger) ServiceRunner, loggingConfig *LoggingConfig) *GoService {
+func MakeService(config service.Config, serviceRunnerProvider ServiceRunnerProvider, loggingConfig *LoggingConfig) *GoService {
 	// Our logger. Initially logs to console, but our code will later
 	// "mute" the console output after some hooks are added.
 	logger := createLogger(os.Stderr, logrus.DebugLevel)
-	runner := serviceRunnerProvider(logger)
+	runner, err := serviceRunnerProvider(logger)
+	if err != nil {
+		logAndQuit(logger, err.Error(), true)
+	}
 	adapter := newServiceAdapter(runner, loggingConfig, logger)
 	svc, err := service.New(adapter, &config)
 	if err != nil {
